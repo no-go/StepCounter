@@ -3,6 +3,8 @@
 This is a simple Arduino Pro Mini project with a small I2C OLED Display and
 a MPU-6050 accelerator+Gyroscop chip.
 
+![Photo](photo.jpg)
+
 ## Features
 
  -  switch between 15 Levels with Level 1 vor very sensitiv detection (press wake-up Button above 1s)

@@ -14,17 +14,20 @@ long barrier = 0;
 
 /* HARDWARE I2C: A4 -> SDA, A5 -> SCL */
 
-#define OLED_RESET 4
-Adafruit_SSD1306 display(OLED_RESET);
+#define BUTTON1        2
+#define STEPLED       13
+#define OLED_RESET     4 // (unused)
 
-#define BUTTON1 2
-#define STEPLED 13
-#define DELAYTRESHOLD 3
-#define DELAYOFF 20
+#define DELAYTRESHOLD  3
+#define DELAYOFF      20
 
 #define MAX_POWER  4100.0
 #define MIN_POWER  3500.0
 
+Adafruit_SSD1306 display(OLED_RESET);
+
+
+// battery
 byte maxLength = 28;
 int  vcc;
 
@@ -45,6 +48,7 @@ bool showTreshold = false;
 // At 0 degrees: -512 - (340 * 35) = -12412
 double dT;
 
+// Sleep - Logo
 static const uint8_t PROGMEM bitmap[] = {
 B00000000,B00000000,B01111110,B00000000,B00000000,
 B00000000,B00000111,B11110001,B11100000,B00000000,
@@ -137,10 +141,10 @@ void setup() {
   display.setTextColor(WHITE);
   display.setTextSize(2);
   display.setCursor(0,0);
-  display.println("Jens P.");
+  display.println("John D.");
   display.setTextSize(1);
-  display.println("47802 Krefeld");
-  display.print("Heyenbaumstr. 116a");
+  display.println("90210 B-Hills");
+  display.print("Fashionstreet 42");
   display.display();
   EEPROM.get(eeAddress, steps);
   delay(3000);

@@ -19,9 +19,9 @@
 #define LED_OFF    LOW
 #define LED_ON     HIGH
 
-#define STEP_TRESHOLD  150
-#define ON_TRESHOLD    800
+#define ON_TRESHOLD    300
 #define ON_SEC         4
+#define MEMOSTR_LIMIT  25
 
 #define SERIAL_SPEED  9600
 
@@ -33,14 +33,17 @@ byte tick    = 0;
 byte loopi   = 0;
 
 const int MPU=0x68;  // I2C address of the MPU-6050
-int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
-double dT;
+int16_t AcX,AcY,AcZ;
 unsigned long stoss1;
 unsigned long stoss2;
+
+char memoStr[MEMOSTR_LIMIT] = {'\0'};
+byte memoStrPos = 0;
 
 int  vcc = 3100;
 long steps = 0;
 long goal  = 10000;
+long threshold = 90;
 
 static const uint8_t PROGMEM stepicon[] = {
 B01100000,B00000000,
@@ -69,6 +72,8 @@ void readVcc() {
   vcc |= ADCH<<8; 
   vcc = 1126400L / vcc;
 }
+
+inline byte tob(char c) { return c - '0';}
 
 void hideA(byte x, short y, int h) {
   oled->fillRect(x, y+h, 16, 32-h, BLACK);
@@ -313,6 +318,35 @@ inline void ticking() {
   }
 }
 
+void serialEvent() {
+  while (Serial.available()) {
+    if (memoStrPos >= MEMOSTR_LIMIT) memoStrPos = MEMOSTR_LIMIT;
+    char inChar = (char)Serial.read();
+    if (inChar == '\n') {
+      memoStr[MEMOSTR_LIMIT-1] = '\n';
+      continue;
+    }
+    if (inChar == 'A') {
+      digitalWrite(LED_RED, HIGH);
+    }
+    if (inChar == 'B') {
+      digitalWrite(LED_GREEN, HIGH);
+    }
+    if (inChar == 'C') {
+      digitalWrite(LED_GREEN, HIGH);
+      digitalWrite(LED_RED, HIGH);
+    }
+    digitalWrite(LED_BLUE, HIGH);
+    memoStr[memoStrPos] = inChar;
+    memoStrPos++;    
+    if (memoStrPos >= MEMOSTR_LIMIT) {
+      // ignore the other chars
+      memoStrPos = MEMOSTR_LIMIT-1;
+      memoStr[memoStrPos] = '\0';
+    }
+  }
+}
+
 void setup() {
   pinMode(BUTTON1, INPUT_PULLUP);
   pinMode(BUTTON2, INPUT_PULLUP);
@@ -330,7 +364,9 @@ void setup() {
   Wire.endTransmission(true);
 
   Serial.begin(SERIAL_SPEED);
-
+  Serial.println("AT+NAME=I2C Step Watch");
+  delay(800);
+  
   oled->begin();
   oled->clearDisplay();
   oled->display();
@@ -369,7 +405,6 @@ void loop() {
     }
   }
 
-  
   oled->clearDisplay();
   oled->drawBitmap(2, 50, stepicon,  16, 13, WHITE);
   flipClock();
@@ -403,26 +438,31 @@ void loop() {
   oled->display();
 
   if (loopi==0) {
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    
     Wire.beginTransmission(MPU);
     Wire.write(0x3B);
     Wire.endTransmission(false);
     Wire.requestFrom(MPU,14,true);  // request a total of 14 registers
+
+    //unused
+    AcX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+    AcX=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+    AcX=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+    AcX=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
     
-    GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-    GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-    GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-    Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
     AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
     AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
     AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-    dT = ( (double) Tmp + 12412.0) / 340.0;
     stoss1 = (((unsigned long)AcX)*((unsigned long)AcX) + ((unsigned long)AcY)*((unsigned long)AcY) + ((unsigned long)AcZ)*((unsigned long)AcZ))/1000000l; 
 
     if (stoss1 > stoss2) {
-      if ((stoss1-stoss2) > STEP_TRESHOLD) steps++;
+      if ((stoss1-stoss2) > threshold) steps++;
       if ((stoss1-stoss2) > ON_TRESHOLD) onsec=1;      
     } else {
-      if ((stoss2-stoss1) > STEP_TRESHOLD) steps++;
+      if ((stoss2-stoss1) > threshold) steps++;
       if ((stoss2-stoss1) > ON_TRESHOLD) onsec=1;      
     }
     
@@ -435,6 +475,27 @@ void loop() {
   if (onsec > ON_SEC) {
     onsec = 0;
     oled->ssd1306_command(SSD1306_DISPLAYOFF);
+  }
+
+  if ((memoStr[0]=='0' || memoStr[0]=='1' || memoStr[0]=='2') && memoStr[MEMOSTR_LIMIT-1] == '\n') {
+    onsec = 1;
+    hours = tob(memoStr[0])*10 + tob(memoStr[1]);
+    minutes = tob(memoStr[2])*10 + tob(memoStr[3]);
+    seconds = tob(memoStr[4])*10 + tob(memoStr[5]);
+
+    goal  = tob(memoStr[12]);
+    goal += 100000l*tob(memoStr[7]);
+    goal += 10000l*tob(memoStr[8]);
+    goal += 1000l*tob(memoStr[9]);
+    goal += 100l*tob(memoStr[10]);
+    goal += 10l*tob(memoStr[11]);
+
+    threshold  = tob(memoStr[16]);
+    threshold += 100*tob(memoStr[14]);
+    threshold += 10*tob(memoStr[15]);
+
+    memoStr[MEMOSTR_LIMIT-1] = '\0';
+    memoStrPos=0;
   }
 }
 

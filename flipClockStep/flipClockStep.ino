@@ -20,8 +20,8 @@
 #define LED_ON     HIGH
 
 #define ON_TRESHOLD    300
-#define ON_SEC         4
-#define MEMOSTR_LIMIT  25
+#define ON_SEC         3
+#define MEMOSTR_LIMIT  90
 
 #define SERIAL_SPEED  9600
 
@@ -43,7 +43,7 @@ byte memoStrPos = 0;
 int  vcc = 3100;
 long steps = 0;
 long goal  = 10000;
-long threshold = 90;
+long threshold = 100;
 
 static const uint8_t PROGMEM stepicon[] = {
 B01100000,B00000000,
@@ -383,6 +383,7 @@ void loop() {
 
   if (tick==0 && (seconds%10==0)) {
     readVcc();
+    Serial.printf("st=%d th=%d goal=%d %dmV\n", (int)steps, (int)threshold, (int)goal, (int)vcc);
   }
   
   if (digitalRead(BUTTON1) == LOW) {
@@ -478,7 +479,7 @@ void loop() {
   }
 
   if ((memoStr[0]=='0' || memoStr[0]=='1' || memoStr[0]=='2') && memoStr[MEMOSTR_LIMIT-1] == '\n') {
-    onsec = 1;
+    onsec = 0;
     hours = tob(memoStr[0])*10 + tob(memoStr[1]);
     minutes = tob(memoStr[2])*10 + tob(memoStr[3]);
     seconds = tob(memoStr[4])*10 + tob(memoStr[5]);
@@ -493,9 +494,24 @@ void loop() {
     threshold  = tob(memoStr[16]);
     threshold += 100*tob(memoStr[14]);
     threshold += 10*tob(memoStr[15]);
-
+    
+  }
+  
+  if (memoStr[MEMOSTR_LIMIT-1] == '\n') {
+    memoStr[memoStrPos] = '\0';
     memoStr[MEMOSTR_LIMIT-1] = '\0';
     memoStrPos=0;
+    
+    oled->ssd1306_command(SSD1306_DISPLAYON);
+    oled->clearDisplay();
+    oled->setTextSize(1);
+    oled->setCursor(0, 0);
+    oled->print(memoStr);
+    oled->display();
+    oled->setTextSize(2);
+    delay(4000);
+    oled->ssd1306_command(SSD1306_DISPLAYOFF);    
   }
+
 }
 

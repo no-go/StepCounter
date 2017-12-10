@@ -16,6 +16,8 @@ a MPU-6050 accelerator+Gyroscop chip.
  -  serial: Send C to make RGB-LED white
  -  serial: Send 123456 000876 080 to set 12:34 and 56sec, day goal=876, step treshold=80 (low)
 
+Every 10sec it sends via bluetooth: steps, actual threshold, daily goal and power in mV
+
 ## Circuit (old)
 
 ![Circuit](circuit/circuit.png)

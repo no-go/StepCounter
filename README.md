@@ -18,6 +18,13 @@ a MPU-6050 accelerator+Gyroscop chip.
 
 Every 10sec it sends via bluetooth: steps, actual threshold, daily goal and power in mV
 
+## EEpROM
+
+- on every set: store goal, treshold, steps, hour, minute
+- on every 500 steps: store steps
+- on every hour: store steps
+- on every 20min: store hour and minute
+
 ## Circuit (old)
 
 ![Circuit](circuit/circuit.png)

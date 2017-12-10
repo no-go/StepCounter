@@ -4,6 +4,14 @@
 #include <Wire.h> //I2C Arduino Library
 #include <Adafruit_GFX.h>
 #include "Adafruit_SSD1306.h"
+#include <EEPROM.h>
+
+// byte addr
+int eeStepsAdr    = 0; // long: 0,1,2,3
+int eeTresholdAdr = 4; // long: 4,5,6,7
+int eeGoalAdr     = 8; // takes 4 bytes, too! -> 11
+int eeHourAdr     = 12; // only 1 byte
+int eeMinAdr      = 13;
 
 // HARDWARE I2C: A4 -> SDA, A5 -> SCL
 // --------- HARDWARE SPI OLED: 11 -> MOSI/DIN, 13 -> SCK
@@ -23,6 +31,9 @@
 #define ON_SEC         3
 #define MEMOSTR_LIMIT  90
 
+#define DEF_GOAL   10000
+#define DEF_TRESH  100
+
 #define SERIAL_SPEED  9600
 
 byte hours   = 18;
@@ -41,9 +52,9 @@ char memoStr[MEMOSTR_LIMIT] = {'\0'};
 byte memoStrPos = 0;
 
 int  vcc = 3100;
-long steps = 0;
-long goal  = 10000;
-long threshold = 100;
+long steps     = 0;
+long goal      = DEF_GOAL;
+long threshold = DEF_TRESH;
 
 static const uint8_t PROGMEM stepicon[] = {
 B01100000,B00000000,
@@ -308,8 +319,13 @@ inline void ticking() {
   if (seconds > 59) {
     minutes += seconds / 60;
     seconds  = seconds % 60;
+    if (minutes%20==0) {
+      EEPROM.put(eeHourAdr, hours);
+      EEPROM.put(eeMinAdr, minutes);
+    }
   }
   if (minutes > 59) {
+    EEPROM.put(eeStepsAdr, steps);
     hours  += minutes / 60;
     minutes = minutes % 60;
   }
@@ -366,6 +382,15 @@ void setup() {
   Serial.begin(SERIAL_SPEED);
   Serial.println("AT+NAME=I2C Step Watch");
   delay(800);
+
+  EEPROM.get(eeTresholdAdr, threshold);
+  EEPROM.get(eeGoalAdr, goal);
+  EEPROM.get(eeStepsAdr, steps);
+  EEPROM.get(eeMinAdr, minutes);
+  EEPROM.get(eeHourAdr, hours);
+  if (goal      < 0) goal      = DEF_GOAL;
+  if (threshold < 0) threshold = DEF_TRESH;
+  if (steps     < 0) steps     = 0;
   
   oled->begin();
   oled->clearDisplay();
@@ -460,10 +485,17 @@ void loop() {
     stoss1 = (((unsigned long)AcX)*((unsigned long)AcX) + ((unsigned long)AcY)*((unsigned long)AcY) + ((unsigned long)AcZ)*((unsigned long)AcZ))/1000000l; 
 
     if (stoss1 > stoss2) {
-      if ((stoss1-stoss2) > threshold) steps++;
-      if ((stoss1-stoss2) > ON_TRESHOLD) onsec=1;      
+      if ((stoss1-stoss2) > threshold) {
+        steps++;
+        if (steps%500==0) EEPROM.put(eeStepsAdr, steps);
+      }
+      if ((stoss1-stoss2) > ON_TRESHOLD) onsec=1;
+          
     } else {
-      if ((stoss2-stoss1) > threshold) steps++;
+      if ((stoss2-stoss1) > threshold) {
+        steps++;
+        if (steps%500==0) EEPROM.put(eeStepsAdr, steps);
+      }
       if ((stoss2-stoss1) > ON_TRESHOLD) onsec=1;      
     }
     
@@ -479,22 +511,27 @@ void loop() {
   }
 
   if ((memoStr[0]=='0' || memoStr[0]=='1' || memoStr[0]=='2') && memoStr[MEMOSTR_LIMIT-1] == '\n') {
+    EEPROM.put(eeStepsAdr, steps);
+    
     onsec = 0;
     hours = tob(memoStr[0])*10 + tob(memoStr[1]);
     minutes = tob(memoStr[2])*10 + tob(memoStr[3]);
     seconds = tob(memoStr[4])*10 + tob(memoStr[5]);
-
+    EEPROM.put(eeHourAdr, hours);
+    EEPROM.put(eeMinAdr, minutes);
+    
     goal  = tob(memoStr[12]);
     goal += 100000l*tob(memoStr[7]);
     goal += 10000l*tob(memoStr[8]);
     goal += 1000l*tob(memoStr[9]);
     goal += 100l*tob(memoStr[10]);
     goal += 10l*tob(memoStr[11]);
-
+    EEPROM.put(eeGoalAdr, goal);
+    
     threshold  = tob(memoStr[16]);
     threshold += 100*tob(memoStr[14]);
     threshold += 10*tob(memoStr[15]);
-    
+    EEPROM.put(eeTresholdAdr, threshold);
   }
   
   if (memoStr[MEMOSTR_LIMIT-1] == '\n') {

@@ -53,10 +53,12 @@ Wtv020sd16p wtv020sd16p(resetPin,clockPin,dataPin,busyPin);
 
 byte hours   = 18;
 byte minutes = 59;
-byte seconds = 50;
+byte seconds = 40;
 byte onsec   = 0;
 byte tick    = 0;
-bool gong    = false;
+
+int gong    = 0;
+int oldgong = 0;
 
 byte mode = 0;
 byte lamp = 0;
@@ -376,58 +378,130 @@ enum Sounds {
   OCLOCK,UND,IT_IS,EINS
 };
 
-void talk59(int num) {
-  int tenth = num/10;
-  if (num < 1) {
-    wtv020sd16p.asyncPlayVoice(ZERO);
-
-  } else if (num == 1) {
-    wtv020sd16p.asyncPlayVoice(EINS);
-
-  } else if (num > 1 && num < 13) {
-    wtv020sd16p.asyncPlayVoice(num);
-
-  } else {
-    num = num - 10*tenth;
-    if (num > 0) {
-      wtv020sd16p.asyncPlayVoice(num);
-      delay(1000); 
-    }
-    
-    if (tenth > 1 && num > 0) {
-      wtv020sd16p.asyncPlayVoice(UND);
-      delay(800);
-    }
-    
-    if (tenth == 1) {
-      wtv020sd16p.asyncPlayVoice(ZEHN);
-    } else if (tenth == 2) {
-      wtv020sd16p.asyncPlayVoice(ZWANZIG);
-    } else if (tenth == 3) {
-      wtv020sd16p.asyncPlayVoice(DREIZIG);
-    } else if (tenth == 4) {
-      wtv020sd16p.asyncPlayVoice(VIERZIG);
-    } else if (tenth == 5) {
-      wtv020sd16p.asyncPlayVoice(FUENFZIG);
-    }
-  }
-  delay(1000);
-}
-
 void talkClock() {
-  wtv020sd16p.asyncPlayVoice(IT_IS);
-  delay(1500);
-  if (hours == 1) {
-    wtv020sd16p.asyncPlayVoice(EIN);
-    delay(1000);
-  } else {
-    talk59(hours);
+  int num = hours;
+  int tenth = num/10;
+  
+  if (oldgong==gong) return;
+
+  switch (gong) {
+    case 1:
+      wtv020sd16p.asyncPlayVoice(IT_IS);
+      oldgong=gong;
+      break;
+
+    case 2:
+      //wtv020sd16p.asyncPlayVoice(IT_IS);
+      oldgong=gong;
+      break;
+      
+    case 3:
+      if (num < 1) {
+        wtv020sd16p.asyncPlayVoice(ZERO);
+        gong++;
+    
+      } else if (num == 1) {
+        wtv020sd16p.asyncPlayVoice(EIN);
+    
+      } else if (num > 1 && num < 13) {
+        wtv020sd16p.asyncPlayVoice(num);
+        gong++;
+        
+      } else {
+        num = num - 10*tenth;
+        if (num > 0) wtv020sd16p.asyncPlayVoice(num);
+        
+      }
+      oldgong=gong;
+      break;
+      
+    case 4:
+      num = hours - 10*tenth;
+      if (tenth > 1 && num > 0) {
+        wtv020sd16p.asyncPlayVoice(UND);
+      }
+      oldgong=gong;
+      break;
+      
+    case 5:
+      if (tenth == 1 && hours>12) {
+        wtv020sd16p.asyncPlayVoice(ZEHN);
+      } else if (tenth == 2) {
+        wtv020sd16p.asyncPlayVoice(ZWANZIG);
+      } else if (tenth == 3) {
+        wtv020sd16p.asyncPlayVoice(DREIZIG);
+      } else if (tenth == 4) {
+        wtv020sd16p.asyncPlayVoice(VIERZIG);
+      } else if (tenth == 5) {
+        wtv020sd16p.asyncPlayVoice(FUENFZIG);
+      }
+      oldgong=gong;
+      break;
+      
+    case 6:
+      oldgong=gong;
+      break;
+      
+    case 7:
+      wtv020sd16p.asyncPlayVoice(OCLOCK);
+      oldgong=gong;
+      break;
+      
+    case 8:
+      num = minutes;
+      tenth = num/10;
+      
+      if (num == 1) {
+        wtv020sd16p.asyncPlayVoice(EINS);
+    
+      } else if (num > 1 && num < 13) {
+        wtv020sd16p.asyncPlayVoice(num);
+        gong++;
+        
+      } else {
+        num = num - 10*tenth;
+        if (num > 0) wtv020sd16p.asyncPlayVoice(num);
+      }      
+      oldgong=gong;
+      break;
+
+    case 9:
+      tenth = minutes/10;
+      num = minutes - 10*tenth;
+      if (tenth > 1 && num > 0) {
+        wtv020sd16p.asyncPlayVoice(UND);
+      }
+      oldgong=gong;
+      break;
+      
+    case 10:
+      num = minutes;
+      tenth = num/10;
+      if (tenth == 1 && minutes>12) {
+        wtv020sd16p.asyncPlayVoice(ZEHN);
+      } else if (tenth == 2) {
+        wtv020sd16p.asyncPlayVoice(ZWANZIG);
+      } else if (tenth == 3) {
+        wtv020sd16p.asyncPlayVoice(DREIZIG);
+      } else if (tenth == 4) {
+        wtv020sd16p.asyncPlayVoice(VIERZIG);
+      } else if (tenth == 5) {
+        wtv020sd16p.asyncPlayVoice(FUENFZIG);
+      }
+      oldgong=gong;
+      break;
+
+    default:
+      gong=0;
+      oldgong=0;
   }
-  wtv020sd16p.asyncPlayVoice(OCLOCK);
-  delay(900);
-  if (minutes > 0) talk59(minutes);
-  gong = false;
 }
+
+
+
+
+
+
 //------------------------------------------------------------------------
 
 inline void flipClock() {
@@ -466,6 +540,7 @@ inline void ticking() {
   if (tick == 0) {
     seconds++;
     if (onsec > 0) onsec++;
+    if (gong  > 0) gong++;
   }
   
   if (seconds > 59) {
@@ -486,7 +561,7 @@ inline void ticking() {
     hours = hours % 24;
   }
 
-  if (tick==0 && seconds==0 && (minutes%15==0)) gong = true;
+  if (tick==0 && seconds==0 && (minutes%15==0)) gong = 1; // every 15 min !!!!!!!!!!!!!!!!!!!!!!!!!
 }
 
 void serialEvent() {
@@ -678,7 +753,7 @@ void loop() {
     Serial.printf("st=%d th=%d goal=%d %dmV\n", (int)steps, (int)threshold, (int)goal, (int)vcc);
   }
   
-  if (gong) talkClock();
+  if (gong>0) talkClock(); // every 15 min !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
   if (digitalRead(BUTTON1) == LOW) {
     delay(200);
@@ -823,12 +898,12 @@ void loop() {
   GcYold = GcY;
 
   if (onsec==1) {
+    gong = 1;
     oled->ssd1306_command(SSD1306_DISPLAYON);
   }
   if (onsec > ON_SEC) {
     onsec = 0;
     oled->ssd1306_command(SSD1306_DISPLAYOFF);
-    talkClock();
   }
 
   if ((memoStr[0]=='0' || memoStr[0]=='1' || memoStr[0]=='2') && memoStr[MEMOSTR_LIMIT-1] == '\n') {

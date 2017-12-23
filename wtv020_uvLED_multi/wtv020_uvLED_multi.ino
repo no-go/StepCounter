@@ -56,6 +56,7 @@ byte minutes = 59;
 byte seconds = 50;
 byte onsec   = 0;
 byte tick    = 0;
+bool gong    = false;
 
 byte mode = 0;
 byte lamp = 0;
@@ -425,6 +426,7 @@ void talkClock() {
   wtv020sd16p.asyncPlayVoice(OCLOCK);
   delay(900);
   if (minutes > 0) talk59(minutes);
+  gong = false;
 }
 //------------------------------------------------------------------------
 
@@ -483,6 +485,8 @@ inline void ticking() {
   if (hours > 23) {
     hours = hours % 24;
   }
+
+  if (tick==0 && seconds==0 && (minutes%15==0)) gong = true;
 }
 
 void serialEvent() {
@@ -674,15 +678,16 @@ void loop() {
     Serial.printf("st=%d th=%d goal=%d %dmV\n", (int)steps, (int)threshold, (int)goal, (int)vcc);
   }
   
-  if (tick==0 && seconds==0 && (minutes%15==0)) {
-    talkClock();
-  }
+  if (gong) talkClock();
   
   if (digitalRead(BUTTON1) == LOW) {
-    delay(800);
+    delay(200);
     onsec=1;
     if (digitalRead(BUTTON1) == LOW) {
-      mode = (mode+1)%5;
+      delay(800);
+      if (digitalRead(BUTTON1) == LOW) {
+        mode = (mode+1)%5;
+      }
     }
   }
   

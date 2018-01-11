@@ -5,6 +5,8 @@ a MPU-6050 accelerator+Gyroscop chip.
 
 ## Features
 
+folder: flipClockStep
+
  -  count steps
  -  Display sleep Mode (shake to wake up)
  -  Clock (set button1 = hours, button2 = minutes)

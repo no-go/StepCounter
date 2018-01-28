@@ -3,11 +3,6 @@
 #include <Adafruit_GFX.h>
 #include "Adafruit_SSD1306.h"
 
-#define LOG_OUT 1 // use the log output function
-#define FHT_N 64 // set to 256 point fht
-
-#include <FHT.h> // include the library
-
 #define BUTTON1    A3
 #define BUTTON2    A2
 
@@ -17,7 +12,7 @@
 #define LED_UV     3
 
 #define SERIAL_SPEED  9600
-#define MIDSIZE       64
+#define MIDSIZE       120
 
 // HARDWARE I2C: A4 -> SDA, A5 -> SCL
 // --------- HARDWARE SPI OLED: 11 -> MOSI/DIN, 13 -> SCK
@@ -37,10 +32,22 @@ const int MPU=0x68;  // I2C address of the MPU-6050
 int16_t val;
 
 int ticks = 0;
+int  vcc = 3100;
+
+void readVcc() {
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(16); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Start conversion
+  while (bit_is_set(ADCSRA,ADSC)); // measuring
+  vcc = ADCL; 
+  vcc |= ADCH<<8; 
+  vcc = 1126400L / vcc;
+}
 
 struct Midways {
   uint8_t _basic;
   uint8_t _val[MIDSIZE];
+  uint8_t _freq[MIDSIZE/2];
   int _nxt;
 
   Midways(uint8_t initval) {
@@ -68,35 +75,38 @@ struct Midways {
 
   void draw(byte x, byte y, float fak) {
     int q;
-    
+    for (q=0; q<MIDSIZE/2; q++) {
+      _freq[q] = 0;
+    }
     int id = _nxt-1;
     float mid = midget();
     if (id < 0) id += MIDSIZE;
 
     byte lastx,lasty;
-    byte dx = x + 1.0*(MIDSIZE);
+    byte dx = x + 0.5*(MIDSIZE);
     short dy = y - fak*((float)_val[id] - mid);
     
     for (int i=0; i<MIDSIZE; i++) {
       lastx = dx;
       lasty = dy;
-      dx = x + 1.0*(MIDSIZE-i);
+      dx = x + 0.5*(MIDSIZE-i);
       dy = y - fak*((float)_val[id] - mid);
       if (dy < 0 || dy > 63) dy = 0;
       oled->drawLine(lastx, lasty, dx, dy, WHITE);
       id--;
       if (id < 0) id += MIDSIZE;
-      fht_input[id] = _val[id];
+      if (dy>32) {
+        for (q=7; q<MIDSIZE/2; q++) {
+//          if (id%q==0) _freq[q-10] += ((dy-32) * (q-9))/10;
+          if (id%q==0) _freq[q-7] += dy-32;
+        }
+      }
     }
   }
 
   void drawf(byte x, byte y) {
-    fht_window(); // window the data for better frequency response
-    fht_reorder(); // reorder the data before doing the fht
-    fht_run(); // process the data in the fht
-    fht_mag_log(); // take the output of the fht
-    for (int q=2; q<FHT_N/2; ++q) {
-      oled->drawLine(x+2*(q-2), y, x+2*(q-2), y-fht_log_out[q], WHITE);
+    for (int q=0; q<MIDSIZE/2; q+=2) {
+      oled->drawLine(x+q, y, x+q, y-_freq[q], WHITE);
     }
   }
 };
@@ -150,7 +160,9 @@ void loop() {
     ticks=0;
     oled->clearDisplay();
     oled->setCursor(0, 0);
-    oled->print(val);  
+    oled->print(val);
+    oled->setCursor(90, 0);
+    oled->print(vcc);
     mee1->draw (0,  32, 0.25);
     mee1->drawf(64, 63);
     oled->display();
@@ -163,6 +175,88 @@ void loop() {
 
   val=128 + Wire.read();  // 0x3D (Accel_YOUT_H)
   mee1->add(val);
-  delay(30);
+
+  if (val < 140) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 150) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 160) {
+    digitalWrite(LED_UV,    HIGH);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 170) {
+    digitalWrite(LED_UV,    HIGH);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 180) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 190) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 195) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 200) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 205) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 320) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 325) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val < 330) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   HIGH);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 340) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  LOW);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 350) {
+    digitalWrite(LED_UV,    HIGH);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, HIGH);
+  } else if (val < 365) {
+    digitalWrite(LED_UV,    HIGH);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, LOW);
+  } else if (val > 370) {
+    digitalWrite(LED_UV,    LOW);
+    digitalWrite(LED_BLUE,  HIGH);
+    digitalWrite(LED_RED,   LOW);
+    digitalWrite(LED_GREEN, LOW);
+  }
+  readVcc();
 }
 
